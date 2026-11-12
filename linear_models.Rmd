@@ -1,0 +1,101 @@
+---
+title: "linear_models"
+author: "Julian Morales"
+date: "2026-11-12"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(p8105.datasets)
+
+set.seed(1)
+```
+
+## Airbnb
+```{r}
+data("nyc_airbnb")
+
+nyc_airbnb = nyc_airbnb |> 
+  mutate(
+    stars = review_scores_location / 2
+  ) |> 
+  rename(
+    borough = neighbourhood_group,
+    neighborhood = neighbourhood
+  ) |> 
+  filter(
+    borough != "Staten Island"
+  ) |> 
+  select(price, stars, borough, neighborhood, room_type)
+```
+
+Fit a linear regression
+
+```{r}
+fit = lm(price ~ stars + borough, data = nyc_airbnb)
+```
+
+```{r}
+nyc_airbnb = 
+  nyc_airbnb |> 
+  mutate(
+    borough = fct_infreq(borough),
+    room_type = fct_infreq(room_type))
+
+fit = lm(price ~ stars + borough, data = nyc_airbnb)
+```
+
+tidying output
+```{r}
+summary(fit)
+summary(fit)$coef
+coef(fit)
+fitted.values(fit)
+```
+
+broom::
+```{r}
+fit |> 
+  broom::tidy() |> 
+  select(term, estimate, p.value) |> 
+  mutate(term = str_replace(term, "^borough", "Borough: ")) |> 
+  knitr::kable(digits = 3)
+```
+
+change reference category
+```{r}
+fit = 
+  nyc_airbnb |> 
+  mutate(
+    borough = fct_infreq(borough)
+  ) |> 
+  lm(price~stars+borough, data = _)
+
+broom::tidy(fit) |> 
+  select(-std.error) |> 
+  mutate(term = str_replace(term, "borough", "Borough: ")) |> 
+  knitr::kable(digits = 3)
+```
+
+## Diagnostics
+
+diagnostics is basically "look at the residuals"
+
+```{r}
+modelr::add_residuals(nyc_airbnb, fit)
+```
+
+so we can look at residuals
+
+```{r}
+nyc_airbnb |> 
+  modelr::add_residuals(fit) |> 
+  ggplot(aes(x = stars, y = resid)) + 
+  geom_point()
+
+nyc_airbnb |> 
+  modelr::add_residuals(fit) |> 
+  ggplot(aes(x = borough, y = resid)) + 
+  geom_violin()
+```
+
