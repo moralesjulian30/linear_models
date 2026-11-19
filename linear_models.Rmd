@@ -107,3 +107,98 @@ broom::tidy(fit) |>
   knitr::kable(digits = 3)
 ```
 
+try testing nested models
+
+```{r}
+fit_null = lm(price~stars, data = nyc_airbnb)
+fit_alt = lm(price~ stars + borough, data = nyc_airbnb)
+
+anova(fit_null, fit_alt)
+```
+
+## Nesting data
+
+try a more complicated model
+
+```{r}
+nyc_airbnb |> 
+  lm(price~ stars + borough + room_type*borough, data = _) |> 
+  broom::tidy() |> 
+  knitr::kable(digits = 3)
+```
+
+lets do iteration
+
+```{r}
+airbnb_lm = function(data) {
+  
+  lm(price~ stars + room_type, data = data)
+  
+}
+```
+
+
+```{r}
+nyc_airbnb |> 
+  nest(datasets = -borough) |> 
+  mutate(
+    fits = map(datasets, airbnb_lm),
+    results = map(fits, broom::tidy)
+  ) |> 
+  select(-datasets, -fits) |> 
+  unnest(results) |> 
+  select(borough, term, estimate) |> 
+  pivot_wider(
+    names_from = term,
+    values_from = estimate
+  )
+```
+
+
+```{r}
+nyc_airbnb |> 
+  filter(borough == "Manhattan") |> 
+  nest(datasets = -neighborhood) |> 
+  mutate(
+    fits = map(datasets, \(df) lm(price~ stars + room_type, data = df)),
+    results = map(fits, broom::tidy)
+  ) |> 
+  select(neighborhood, results) |> 
+  unnest(results) |> 
+  filter(term == "room_typePrivate room") |> 
+  ggplot(aes(x = neighborhood, y = estimate)) + 
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
+
+
+
+## logistic regression
+
+import the Wp homocide data
+
+```{r}
+baltimore_df = 
+  read_csv("data/homicide-data.csv") |> 
+  filter(city == "Baltimore") |> 
+  mutate(
+    resolved = as.numeric(disposition == "Closed by arrest"),
+    victim_age = as.numeric(victim_age)
+  )
+```
+
+fit the logistic regression
+
+```{r}
+fit_logistic = 
+  baltimore_df |> 
+  mutate(victim_race = fct_infreq(victim_race)) |> 
+  glm(resolved ~ victim_age + victim_race, data = _, family = binomial())
+
+fit_logistic |> 
+  broom::tidy() |>
+  mutate(OR = exp(estimate)) |> 
+  select(term, OR, estimate, p.value) |> 
+  knitr::kable(digits = 3)
+```
+
